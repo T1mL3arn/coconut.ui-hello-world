@@ -1,0 +1,8 @@
+-cp src
+-D analyzer-optimize
+-main App
+-dce full
+-lib coconut.ui
+-lib coconut.vdom
+
+-js bin/app.js
