@@ -14,7 +14,7 @@ haxelib git coconut.ui https://github.com/MVCoconut/coconut.ui.git
 
 ## Live demo
 
-You can see it [here](https://t1ml3arn.github.io/coconut.ui-hello-world/bin/)
+You can see it [here](https://t1ml3arn.github.io/coconut.ui-hello-world/bin/). Compare with [react.js demo](https://codepen.io/t1m_/pen/WNQpQVq)
 
 ## License
 
