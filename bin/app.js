@@ -217,11 +217,11 @@ coconut_diffing_Widget.prototype = {
 		if(this._coco_invalid) {
 			this._coco_invalid = false;
 			var nuSnapshot = this._coco_poll().a;
+			this._coco_arm();
 			if(nuSnapshot != this._coco_lastSnapshot) {
 				this._coco_lastSnapshot = nuSnapshot;
 				this._coco_lastRender = this._coco_differ.updateAll(this._coco_lastRender,[nuSnapshot],this,later);
 				later(this._coco_viewUpdated);
-				this._coco_arm();
 			}
 		}
 		return this._coco_lastRender;
@@ -326,12 +326,30 @@ coconut_diffing_Widget.prototype = {
 		later(this._coco_viewMounted);
 	}
 };
-var coconut_ui_View = function(render,shouldUpdate,track,beforeRerender,mounted,updated) {
+var coconut_vdom_View = function(render,shouldUpdate,track,beforeRerender,rendered) {
 	this.__au = [];
 	this.__bc = [];
 	this.__bu = [];
 	this._coco_revision = new tink_state__$State_SimpleState(0,null,null);
 	var _gthis = this;
+	var mounted;
+	if(rendered != null) {
+		var f = rendered;
+		mounted = function() {
+			f(true);
+		};
+	} else {
+		mounted = null;
+	}
+	var updated;
+	if(rendered != null) {
+		var f1 = rendered;
+		updated = function() {
+			f1(false);
+		};
+	} else {
+		updated = null;
+	}
 	var firstTime = true;
 	var last = null;
 	var hasBeforeRerender = beforeRerender != null;
@@ -385,9 +403,9 @@ var coconut_ui_View = function(render,shouldUpdate,track,beforeRerender,mounted,
 		_gthis.__beforeUnmount();
 	});
 };
-coconut_ui_View.__name__ = true;
-coconut_ui_View.__super__ = coconut_diffing_Widget;
-coconut_ui_View.prototype = $extend(coconut_diffing_Widget.prototype,{
+coconut_vdom_View.__name__ = true;
+coconut_vdom_View.__super__ = coconut_diffing_Widget;
+coconut_vdom_View.prototype = $extend(coconut_diffing_Widget.prototype,{
 	__beforeUnmount: function() {
 		var _g = 0;
 		var _g1 = this.__bu.splice(0,this.__bu.length);
@@ -695,20 +713,18 @@ tink_state__$Observable_Transform_$Impl_$.plain = function(f) {
 	return f;
 };
 var App = function(__coco_data_) {
-	this.__tink_defaults112 = { };
-	this.__slots = { };
 	this.__coco_progress = new tink_state__$State_SimpleState(33,null,null);
-	coconut_ui_View.call(this,$bind(this,this.render),null,null,null,null,null);
+	coconut_vdom_View.call(this,$bind(this,this.render),null,null,null,null);
 };
 App.__name__ = true;
 App.main = function() {
-	coconut_ui_Renderer.mount(window.document.getElementById("demo"),App.fromHxx({ },{ }));
+	coconut_vdom_Renderer.mountInto(window.document.getElementById("demo"),App.fromHxx({ },{ }));
 };
 App.fromHxx = function(hxxMeta,attributes) {
 	return coconut_diffing_VNodeData.VWidget(App.__type,hxxMeta.ref,hxxMeta.key,attributes);
 };
-App.__super__ = coconut_ui_View;
-App.prototype = $extend(coconut_ui_View.prototype,{
+App.__super__ = coconut_vdom_View;
+App.prototype = $extend(coconut_vdom_View.prototype,{
 	updateProgress: function(value) {
 		this.__coco_progress.set(value);
 	}
@@ -777,11 +793,12 @@ tink_state_ConstObservable.prototype = {
 		return null;
 	}
 };
-var coconut_ui_tools_Slot = function(owner,compare) {
+var coconut_ui_tools_Slot = function(owner,compare,defaultData) {
 	this.owner = owner;
 	this.compare = compare == null ? function(a,b) {
 		return a == b;
 	} : compare;
+	this.data = this.defaultData = defaultData;
 };
 coconut_ui_tools_Slot.__name__ = true;
 coconut_ui_tools_Slot.prototype = {
@@ -794,9 +811,23 @@ coconut_ui_tools_Slot.prototype = {
 			if(this.data == null) {
 				this.last = new tink_core_MPair(null,new tink_core_FutureTrigger());
 			} else {
+				this.link = null;
 				var m = tink_state__$Observable_Observable_$Impl_$.measure(this.data);
-				this.last = new tink_core_MPair(m.a,new tink_core_FutureTrigger());
-				this.link = m.b.handle(($_=this.last.b,$bind($_,$_.trigger)));
+				var changed = new tink_core_FutureTrigger();
+				var dFault = null;
+				var a;
+				var _g = m.a;
+				if(_g == null && this.defaultData != null) {
+					dFault = tink_state__$Observable_Observable_$Impl_$.measure(this.defaultData);
+					a = dFault.a;
+				} else {
+					a = _g;
+				}
+				this.last = new tink_core_MPair(a,changed);
+				this.link = m.b.handle($bind(changed,changed.trigger));
+				if(dFault != null) {
+					this.link = new tink_core__$Callback_LinkPair(this.link,dFault.b.handle($bind(changed,changed.trigger)));
+				}
 			}
 			this.last.b.handle(tink_core__$Callback_Callback_$Impl_$.fromNiladic(function() {
 				_gthis.last = null;
@@ -805,6 +836,12 @@ coconut_ui_tools_Slot.prototype = {
 		return new tink_core_MPair(this.last.a,this.last.b);
 	}
 	,setData: function(data) {
+		if(data == null) {
+			data = this.defaultData;
+		}
+		if(data == this.data) {
+			return;
+		}
 		this.data = data;
 		if(this.last != null) {
 			var this1 = this.link;
@@ -826,24 +863,19 @@ coconut_ui_tools_Slot.prototype = {
 	}
 };
 var Progress = function(__coco_data_) {
-	this.__tink_defaults111 = { progress : tink_state__$Observable_Observable_$Impl_$.const(0)};
-	this.__slots = { progress : new coconut_ui_tools_Slot(this,null), onchange : new coconut_ui_tools_Slot(this,null)};
+	this.__coco_progress = new coconut_ui_tools_Slot(this,null,tink_state__$Observable_Observable_$Impl_$.const(0));
+	this.__coco_onchange = new coconut_ui_tools_Slot(this,null,null);
 	this.__initAttributes(__coco_data_);
-	coconut_ui_View.call(this,$bind(this,this.render),null,null,null,null,null);
+	coconut_vdom_View.call(this,$bind(this,this.render),null,null,null,null);
 };
 Progress.__name__ = true;
 Progress.fromHxx = function(hxxMeta,attributes) {
 	return coconut_diffing_VNodeData.VWidget(Progress.__type,hxxMeta.ref,hxxMeta.key,attributes);
 };
-Progress.__super__ = coconut_ui_View;
-Progress.prototype = $extend(coconut_ui_View.prototype,{
+Progress.__super__ = coconut_vdom_View;
+Progress.prototype = $extend(coconut_vdom_View.prototype,{
 	onchange: function(a0) {
-		var _g = tink_state__$Observable_Observable_$Impl_$.get_value(this.__slots.onchange);
-		if(_g == null) {
-			throw new js__$Boot_HaxeError("mandatory attribute " + "onchange" + " of <" + "Progress" + "/> was set to null");
-		} else {
-			_g(a0);
-		}
+		tink_state__$Observable_Observable_$Impl_$.get_value(this.__coco_onchange)(a0);
 		return;
 	}
 	,startSeek: function(e) {
@@ -867,7 +899,7 @@ Progress.prototype = $extend(coconut_ui_View.prototype,{
 	}
 	,render: function() {
 		var hxxMeta = { ref : coconut_ui__$Ref_Ref_$Impl_$._new($bind(this,this._coco_set_barElt))};
-		var children = [this.bar({ progress : tink_state__$Observable_Observable_$Impl_$.get_value(this.__slots.progress)})];
+		var children = [this.bar({ progress : tink_state__$Observable_Observable_$Impl_$.get_value(this.__coco_progress)})];
 		return coconut_diffing_VNodeData.VNative(coconut_vdom_Html.DIV,hxxMeta.ref,hxxMeta.key,{ id : "bg", style : { display : "block", width : "300px", backgroundColor : "#654141", height : "20px", padding : "0", margin : "0", borderRadius : "5px"}, onmousedown : $bind(this,this.startSeek)},children);
 	}
 	,bar: function(attr) {
@@ -878,9 +910,8 @@ Progress.prototype = $extend(coconut_ui_View.prototype,{
 		this.barElt = param;
 	}
 	,__initAttributes: function(attributes) {
-		var this1 = attributes.progress;
-		this.__slots.progress.setData(this1 == null ? this.__tink_defaults111.progress : this1);
-		this.__slots.onchange.setData(attributes.onchange);
+		this.__coco_progress.setData(attributes.progress);
+		this.__coco_onchange.setData(attributes.onchange);
 	}
 });
 var HxOverrides = function() { };
@@ -990,13 +1021,13 @@ coconut_diffing_Differ.prototype = {
 							process(n.nodes);
 							break;
 						case 3:
-							var _g5 = n.key;
-							var _g4 = n.ref;
+							var _g9 = n.key;
+							var _g8 = n.ref;
 							var attr = n.a;
 							var type1 = n.type;
-							var real = $with.native(type1,_g5,attr,n.children);
-							var ref2 = [_g4];
-							var n2 = coconut_diffing_RNode.RNative(attr,real,_g4);
+							var real = $with.native(type1,_g9,attr,n.children);
+							var ref2 = [_g8];
+							var n2 = coconut_diffing_RNode.RNative(attr,real,_g8);
 							var registry1;
 							var _g2 = byType.h[type1.__id__];
 							if(_g2 == null) {
@@ -1014,28 +1045,28 @@ coconut_diffing_Differ.prototype = {
 								})(ref2,[real]);
 								later(process2);
 							}
-							if(_g5 == null) {
+							if(_g9 == null) {
 								registry1.put(n2);
 							} else {
-								registry1.set(_g5,n2);
+								registry1.set(_g9,n2);
 							}
 							childList.push(n2);
 							break;
 						case 4:
-							var _g10 = n.key;
-							var _g9 = n.ref;
+							var _g3 = n.key;
+							var _g21 = n.ref;
 							var type2 = n.type;
-							var w1 = $with.widget(type2,_g10,n.a);
-							var ref4 = [_g9];
-							var n3 = coconut_diffing_RNode.RWidget(w1,_g9);
+							var w1 = $with.widget(type2,_g3,n.a);
+							var ref4 = [_g21];
+							var n3 = coconut_diffing_RNode.RWidget(w1,_g21);
 							var registry2;
-							var _g3 = byType.h[type2.__id__];
-							if(_g3 == null) {
+							var _g4 = byType.h[type2.__id__];
+							if(_g4 == null) {
 								var v2 = new coconut_diffing_TypeRegistry();
 								byType.set(type2,v2);
 								registry2 = v2;
 							} else {
-								registry2 = _g3;
+								registry2 = _g4;
 							}
 							if(ref4[0] != null) {
 								var process3 = (function(ref5,r2) {
@@ -1045,10 +1076,10 @@ coconut_diffing_Differ.prototype = {
 								})(ref4,[w1]);
 								later(process3);
 							}
-							if(_g10 == null) {
+							if(_g3 == null) {
 								registry2.put(n3);
 							} else {
-								registry2.set(_g10,n3);
+								registry2.set(_g3,n3);
 							}
 							childList.push(n3);
 							break;
@@ -1090,37 +1121,37 @@ coconut_diffing_Differ.prototype = {
 			++_g;
 			switch(node._hx_index) {
 			case 0:
-				var _g4 = node.ref;
-				if(_g4 != null) {
-					_g4(null);
+				var _g2 = node.ref;
+				if(_g2 != null) {
+					_g2(null);
 				}
 				break;
 			case 1:
-				var _g11 = node.ref;
-				if(_g11 != null) {
-					_g11(null);
+				var _g4 = node.ref;
+				if(_g4 != null) {
+					_g4(null);
 				}
 				break;
 			default:
 			}
 		}
 		var previous = function(t,key) {
-			var _g2 = before.byType.h[t.__id__];
-			if(_g2 == null) {
+			var _g21 = before.byType.h[t.__id__];
+			if(_g21 == null) {
 				return null;
 			} else if(key == null) {
-				return _g2.pull();
+				return _g21.pull();
 			} else {
-				return _g2.get(key);
+				return _g21.get(key);
 			}
 		};
 		var native = function(type,key1,nuAttr,nuChildren) {
-			var _g21 = previous(type,key1);
-			if(_g21 == null) {
+			var _g22 = previous(type,key1);
+			if(_g22 == null) {
 				return _gthis.createNative(type,nuAttr,nuChildren,parent,later);
-			} else if(_g21._hx_index == 0) {
-				var _g41 = _g21.r;
-				type.update(_g41,_g21.a,nuAttr);
+			} else if(_g22._hx_index == 0) {
+				var _g41 = _g22.r;
+				type.update(_g41,_g22.a,nuAttr);
 				_gthis._render(nuChildren,_g41,parent,later);
 				return _g41;
 			} else {
@@ -1128,21 +1159,21 @@ coconut_diffing_Differ.prototype = {
 			}
 		};
 		var after = this._renderAll(nodes,later,parent,{ native : native, widget : function(type1,key2,attr) {
-			var _g22 = previous(type1,key2);
-			if(_g22 == null) {
+			var _g23 = previous(type1,key2);
+			if(_g23 == null) {
 				return _gthis.createWidget(type1,attr,parent,later);
-			} else if(_g22._hx_index == 1) {
-				var _g3 = _g22.w;
+			} else if(_g23._hx_index == 1) {
+				var _g3 = _g23.w;
 				type1.update(attr,_g3);
 				return _g3;
 			} else {
 				throw new js__$Boot_HaxeError("assert");
 			}
 		}, widgetInst : function(w) {
-			var _g23 = previous(coconut_diffing_Differ.WIDGET_INST,coconut_diffing__$Key_Key_$Impl_$.ofObject(w));
-			if(_g23 == null) {
+			var _g24 = previous(coconut_diffing_Differ.WIDGET_INST,coconut_diffing__$Key_Key_$Impl_$.ofObject(w));
+			if(_g24 == null) {
 				_gthis.mountInstance(w,parent,later);
-			} else if(_g23._hx_index != 1) {
+			} else if(_g24._hx_index != 1) {
 				throw new js__$Boot_HaxeError("assert");
 			}
 			return;
@@ -1158,8 +1189,8 @@ coconut_diffing_Differ.prototype = {
 			}
 			if(registry1.unkeyed != null) {
 				var _g5 = 0;
-				var _g12 = registry1.unkeyed;
-				while(_g5 < _g12.length) f(_g12[_g5++]);
+				var _g11 = registry1.unkeyed;
+				while(_g5 < _g11.length) f(_g11[_g5++]);
 			}
 		}
 		return after;
@@ -1186,14 +1217,11 @@ coconut_diffing_Differ.prototype = {
 		if(_g == null) {
 			ret = this.renderAll(nodes,parent,later);
 		} else {
-			_g.each(later,function(_) {
-				lastCount += 1;
-			});
+			lastCount = _g.justCount();
 			ret = this.updateAll(_g,nodes,parent,later);
 		}
 		this.applicator.setLastRender(target,ret);
-		var tmp = this.applicator.traverseChildren(target);
-		this.setChildren(later,lastCount,tmp,ret);
+		this.setChildren(later,lastCount,this.applicator.traverseChildren(target),ret);
 		return ret;
 	}
 	,setChildren: function(later,previousCount,cursor,next,log) {
@@ -1238,7 +1266,9 @@ coconut_diffing_Differ.prototype = {
 	}
 	,createNative: function(type,attr,children,parent,later) {
 		var ret = type.create(attr);
-		this._render(children,ret,parent,later);
+		if(children != null) {
+			this._render(children,ret,parent,later);
+		}
 		return ret;
 	}
 };
@@ -1264,7 +1294,27 @@ var coconut_diffing_Rendered = function(byType,childList) {
 };
 coconut_diffing_Rendered.__name__ = true;
 coconut_diffing_Rendered.prototype = {
-	each: function(later,f) {
+	justCount: function() {
+		var ret = 0;
+		var _g = 0;
+		var _g1 = this.childList;
+		while(_g < _g1.length) {
+			var c = _g1[_g];
+			++_g;
+			var ret1;
+			switch(c._hx_index) {
+			case 0:
+				ret1 = 1;
+				break;
+			case 1:
+				ret1 = c.w._coco_lastRender.justCount();
+				break;
+			}
+			ret += ret1;
+		}
+		return ret;
+	}
+	,each: function(later,f) {
 		var rec = null;
 		rec = function(children) {
 			var _g = 0;
@@ -1340,82 +1390,6 @@ coconut_ui__$Ref_Ref_$Impl_$.__name__ = true;
 coconut_ui__$Ref_Ref_$Impl_$._new = function(f) {
 	return f;
 };
-var coconut_vdom__$Html_Text = function() {
-};
-coconut_vdom__$Html_Text.__name__ = true;
-coconut_vdom__$Html_Text.prototype = {
-	create: function(text) {
-		return window.document.createTextNode(text);
-	}
-	,update: function(target,old,nu) {
-		if(nu != old) {
-			target.textContent = nu;
-		}
-	}
-};
-var coconut_ui__$Renderer_DomBackend = function() {
-};
-coconut_ui__$Renderer_DomBackend.__name__ = true;
-coconut_ui__$Renderer_DomBackend.prototype = {
-	unsetLastRender: function(target) {
-		var ret = target._coco_;
-		delete target._coco_;
-		return ret;
-	}
-	,traverseSiblings: function(first) {
-		return new coconut_ui__$Renderer_DomCursor(first.parentNode,first);
-	}
-	,traverseChildren: function(parent) {
-		return new coconut_ui__$Renderer_DomCursor(parent,parent.firstChild);
-	}
-	,placeholder: function(target) {
-		return coconut_ui__$Renderer_DomBackend.PLACEHOLDER;
-	}
-	,getLastRender: function(target) {
-		return target._coco_;
-	}
-	,setLastRender: function(target,r) {
-		target._coco_ = r;
-	}
-};
-var coconut_ui_Renderer = function() { };
-coconut_ui_Renderer.__name__ = true;
-coconut_ui_Renderer.mount = function(target,vdom) {
-	coconut_ui_Renderer.DIFFER.render([vdom],target);
-};
-var coconut_ui__$Renderer_DomCursor = function(parent,cur) {
-	this.parent = parent;
-	this.cur = cur;
-};
-coconut_ui__$Renderer_DomCursor.__name__ = true;
-coconut_ui__$Renderer_DomCursor.prototype = {
-	insert: function(real) {
-		var inserted = real.parentNode != this.parent;
-		this.parent.insertBefore(real,this.cur);
-		return inserted;
-	}
-	,step: function() {
-		var _g = this.cur;
-		if(_g == null) {
-			return false;
-		} else {
-			return (this.cur = _g.nextSibling) != null;
-		}
-	}
-	,'delete': function() {
-		var _g = this.cur;
-		if(_g == null) {
-			return false;
-		} else {
-			this.cur = _g.nextSibling;
-			this.parent.removeChild(_g);
-			return true;
-		}
-	}
-	,current: function() {
-		return this.cur;
-	}
-};
 var haxe_ds_StringMap = function() {
 	this.h = { };
 };
@@ -1484,7 +1458,7 @@ var coconut_vdom__$Html_Elt = function(tag) {
 coconut_vdom__$Html_Elt.__name__ = true;
 coconut_vdom__$Html_Elt.setSvgProp = function(element,name,newVal,oldVal) {
 	switch(name) {
-	case "viewBox":
+	case "className":case "viewBox":
 		if(newVal == null) {
 			element.removeAttributeNS("http://www.w3.org/2000/svg",name);
 		} else {
@@ -1512,36 +1486,22 @@ coconut_vdom__$Html_Elt.setSvgProp = function(element,name,newVal,oldVal) {
 						var ret = Reflect.copy(newProps);
 						var _g = 0;
 						var _g1 = Reflect.fields(oldProps);
-						while(_g < _g1.length) {
-							var key = _g1[_g];
-							++_g;
-							ret[key] = true;
-						}
+						while(_g < _g1.length) ret[_g1[_g++]] = true;
 						keys = ret;
 					}
 					var _g2 = 0;
 					var _g11 = Reflect.fields(keys);
 					while(_g2 < _g11.length) {
-						var key1 = _g11[_g2];
+						var key = _g11[_g2];
 						++_g2;
-						var _g3 = oldProps[key1];
-						var _g12 = newProps[key1];
+						var _g3 = oldProps[key];
+						var _g12 = newProps[key];
 						if(_g12 == null) {
-							var b = _g3;
-							var a = _g12;
-							if(a != b) {
-								var old = _g3;
-								var nu = _g12;
-								updateProp(element,key1,nu,old);
+							if(_g12 != _g3) {
+								updateProp(element,key,_g12,_g3);
 							}
-						} else {
-							var b1 = _g3;
-							var a1 = _g12;
-							if(a1 != b1) {
-								var old1 = _g3;
-								var nu1 = _g12;
-								updateProp(element,key1,nu1,old1);
-							}
+						} else if(_g12 != _g3) {
+							updateProp(element,key,_g12,_g3);
 						}
 					}
 				}
@@ -1555,7 +1515,7 @@ coconut_vdom__$Html_Elt.setSvgProp = function(element,name,newVal,oldVal) {
 					} else if(HxOverrides.cca(name,0) == 111 && HxOverrides.cca(name,1) == 110) {
 						element[name] = null;
 					} else {
-						delete element[name];
+						delete(element[name]);
 					}
 				} else {
 					element[name] = newVal;
@@ -1578,36 +1538,22 @@ coconut_vdom__$Html_Elt.setSvgProp = function(element,name,newVal,oldVal) {
 						var ret1 = Reflect.copy(newProps1);
 						var _g4 = 0;
 						var _g13 = Reflect.fields(oldProps1);
-						while(_g4 < _g13.length) {
-							var key2 = _g13[_g4];
-							++_g4;
-							ret1[key2] = true;
-						}
+						while(_g4 < _g13.length) ret1[_g13[_g4++]] = true;
 						keys1 = ret1;
 					}
 					var _g5 = 0;
 					var _g14 = Reflect.fields(keys1);
 					while(_g5 < _g14.length) {
-						var key3 = _g14[_g5];
+						var key1 = _g14[_g5];
 						++_g5;
-						var _g6 = oldProps1[key3];
-						var _g15 = newProps1[key3];
+						var _g6 = oldProps1[key1];
+						var _g15 = newProps1[key1];
 						if(_g15 == null) {
-							var b2 = _g6;
-							var a2 = _g15;
-							if(a2 != b2) {
-								var old2 = _g6;
-								var nu2 = _g15;
-								updateProp1(target,key3,nu2,old2);
+							if(_g15 != _g6) {
+								updateProp1(target,key1,_g15,_g6);
 							}
-						} else {
-							var b3 = _g6;
-							var a3 = _g15;
-							if(a3 != b3) {
-								var old3 = _g6;
-								var nu3 = _g15;
-								updateProp1(target,key3,nu3,old3);
-							}
+						} else if(_g15 != _g6) {
+							updateProp1(target,key1,_g15,_g6);
 						}
 					}
 				}
@@ -1619,7 +1565,7 @@ coconut_vdom__$Html_Elt.setSvgProp = function(element,name,newVal,oldVal) {
 					} else if(HxOverrides.cca(name,0) == 111 && HxOverrides.cca(name,1) == 110) {
 						element[name] = null;
 					} else {
-						delete element[name];
+						delete(element[name]);
 					}
 				} else {
 					element[name] = newVal;
@@ -1653,36 +1599,22 @@ coconut_vdom__$Html_Elt.setProp = function(element,name,newVal,oldVal) {
 				var ret = Reflect.copy(newProps);
 				var _g = 0;
 				var _g1 = Reflect.fields(oldProps);
-				while(_g < _g1.length) {
-					var key = _g1[_g];
-					++_g;
-					ret[key] = true;
-				}
+				while(_g < _g1.length) ret[_g1[_g++]] = true;
 				keys = ret;
 			}
 			var _g2 = 0;
 			var _g11 = Reflect.fields(keys);
 			while(_g2 < _g11.length) {
-				var key1 = _g11[_g2];
+				var key = _g11[_g2];
 				++_g2;
-				var _g3 = oldProps[key1];
-				var _g12 = newProps[key1];
+				var _g3 = oldProps[key];
+				var _g12 = newProps[key];
 				if(_g12 == null) {
-					var b = _g3;
-					var a = _g12;
-					if(a != b) {
-						var old = _g3;
-						var nu = _g12;
-						updateProp(element,key1,nu,old);
+					if(_g12 != _g3) {
+						updateProp(element,key,_g12,_g3);
 					}
-				} else {
-					var b1 = _g3;
-					var a1 = _g12;
-					if(a1 != b1) {
-						var old1 = _g3;
-						var nu1 = _g12;
-						updateProp(element,key1,nu1,old1);
-					}
+				} else if(_g12 != _g3) {
+					updateProp(element,key,_g12,_g3);
 				}
 			}
 		}
@@ -1696,7 +1628,7 @@ coconut_vdom__$Html_Elt.setProp = function(element,name,newVal,oldVal) {
 			} else if(HxOverrides.cca(name,0) == 111 && HxOverrides.cca(name,1) == 110) {
 				element[name] = null;
 			} else {
-				delete element[name];
+				delete(element[name]);
 			}
 		} else {
 			element[name] = newVal;
@@ -1719,36 +1651,22 @@ coconut_vdom__$Html_Elt.setProp = function(element,name,newVal,oldVal) {
 				var ret1 = Reflect.copy(newProps1);
 				var _g4 = 0;
 				var _g13 = Reflect.fields(oldProps1);
-				while(_g4 < _g13.length) {
-					var key2 = _g13[_g4];
-					++_g4;
-					ret1[key2] = true;
-				}
+				while(_g4 < _g13.length) ret1[_g13[_g4++]] = true;
 				keys1 = ret1;
 			}
 			var _g5 = 0;
 			var _g14 = Reflect.fields(keys1);
 			while(_g5 < _g14.length) {
-				var key3 = _g14[_g5];
+				var key1 = _g14[_g5];
 				++_g5;
-				var _g6 = oldProps1[key3];
-				var _g15 = newProps1[key3];
+				var _g6 = oldProps1[key1];
+				var _g15 = newProps1[key1];
 				if(_g15 == null) {
-					var b2 = _g6;
-					var a2 = _g15;
-					if(a2 != b2) {
-						var old2 = _g6;
-						var nu2 = _g15;
-						updateProp1(target,key3,nu2,old2);
+					if(_g15 != _g6) {
+						updateProp1(target,key1,_g15,_g6);
 					}
-				} else {
-					var b3 = _g6;
-					var a3 = _g15;
-					if(a3 != b3) {
-						var old3 = _g6;
-						var nu3 = _g15;
-						updateProp1(target,key3,nu3,old3);
-					}
+				} else if(_g15 != _g6) {
+					updateProp1(target,key1,_g15,_g6);
 				}
 			}
 		}
@@ -1760,7 +1678,7 @@ coconut_vdom__$Html_Elt.setProp = function(element,name,newVal,oldVal) {
 			} else if(HxOverrides.cca(name,0) == 111 && HxOverrides.cca(name,1) == 110) {
 				element[name] = null;
 			} else {
-				delete element[name];
+				delete(element[name]);
 			}
 		} else {
 			element[name] = newVal;
@@ -1864,6 +1782,82 @@ coconut_vdom_Html.nodeType = function(tag) {
 		tmp = _g;
 	}
 	return tmp;
+};
+var coconut_vdom__$Html_Text = function() {
+};
+coconut_vdom__$Html_Text.__name__ = true;
+coconut_vdom__$Html_Text.prototype = {
+	create: function(text) {
+		return window.document.createTextNode(text);
+	}
+	,update: function(target,old,nu) {
+		if(nu != old) {
+			target.textContent = nu;
+		}
+	}
+};
+var coconut_vdom__$Renderer_DomBackend = function() {
+};
+coconut_vdom__$Renderer_DomBackend.__name__ = true;
+coconut_vdom__$Renderer_DomBackend.prototype = {
+	unsetLastRender: function(target) {
+		var ret = target._coco_;
+		delete(target["_coco_"]);
+		return ret;
+	}
+	,traverseSiblings: function(first) {
+		return new coconut_vdom__$Renderer_DomCursor(first.parentNode,first);
+	}
+	,traverseChildren: function(parent) {
+		return new coconut_vdom__$Renderer_DomCursor(parent,parent.firstChild);
+	}
+	,placeholder: function(target) {
+		return coconut_vdom__$Renderer_DomBackend.PLACEHOLDER;
+	}
+	,getLastRender: function(target) {
+		return target._coco_;
+	}
+	,setLastRender: function(target,r) {
+		target._coco_ = r;
+	}
+};
+var coconut_vdom_Renderer = function() { };
+coconut_vdom_Renderer.__name__ = true;
+coconut_vdom_Renderer.mountInto = function(target,vdom) {
+	coconut_vdom_Renderer.DIFFER.render([vdom],target);
+};
+var coconut_vdom__$Renderer_DomCursor = function(parent,cur) {
+	this.parent = parent;
+	this.cur = cur;
+};
+coconut_vdom__$Renderer_DomCursor.__name__ = true;
+coconut_vdom__$Renderer_DomCursor.prototype = {
+	insert: function(real) {
+		var inserted = real.parentNode != this.parent;
+		this.parent.insertBefore(real,this.cur);
+		return inserted;
+	}
+	,step: function() {
+		var _g = this.cur;
+		if(_g == null) {
+			return false;
+		} else {
+			return (this.cur = _g.nextSibling) != null;
+		}
+	}
+	,'delete': function() {
+		var _g = this.cur;
+		if(_g == null) {
+			return false;
+		} else {
+			this.cur = _g.nextSibling;
+			this.parent.removeChild(_g);
+			return true;
+		}
+	}
+	,current: function() {
+		return this.cur;
+	}
 };
 var haxe_StackItem = $hxEnums["haxe.StackItem"] = { __ename__ : true, __constructs__ : ["CFunction","Module","FilePos","Method","LocalFunction"]
 	,CFunction: {_hx_index:0,__enum__:"haxe.StackItem",toString:$estr}
@@ -2008,6 +2002,29 @@ js_Boot.__string_rec = function(o,s) {
 		return String(o);
 	}
 };
+var tink_core__$Callback_LinkPair = function(a,b) {
+	this.dissolved = false;
+	this.a = a;
+	this.b = b;
+};
+tink_core__$Callback_LinkPair.__name__ = true;
+tink_core__$Callback_LinkPair.prototype = {
+	cancel: function() {
+		if(!this.dissolved) {
+			this.dissolved = true;
+			var this1 = this.a;
+			if(this1 != null) {
+				this1.cancel();
+			}
+			var this2 = this.b;
+			if(this2 != null) {
+				this2.cancel();
+			}
+			this.a = null;
+			this.b = null;
+		}
+	}
+};
 var tink_core__$Callback_ListCell = function(cb,list) {
 	if(cb == null) {
 		throw new js__$Boot_HaxeError("callback expected but null received");
@@ -2091,9 +2108,6 @@ Progress.__type = { create : function(__coco_data_) {
 }};
 coconut_diffing_Differ.WIDGET_INST = { };
 coconut_diffing_Differ.EMPTY = { };
-coconut_vdom__$Html_Text.inst = new coconut_vdom__$Html_Text();
-coconut_ui__$Renderer_DomBackend.PLACEHOLDER = coconut_diffing_VNodeData.VNative(coconut_vdom__$Html_Text.inst,null,null,"",null);
-coconut_ui_Renderer.DIFFER = new coconut_diffing_Differ(new coconut_ui__$Renderer_DomBackend());
 coconut_vdom__$Html_Elt.namespaces = (function($this) {
 	var $r;
 	var _g = new haxe_ds_StringMap();
@@ -2107,5 +2121,8 @@ coconut_vdom__$Html_Elt.namespaces = (function($this) {
 }(this));
 coconut_vdom_Html.nodeTypes = new haxe_ds_StringMap();
 coconut_vdom_Html.DIV = coconut_vdom_Html.nodeType("div");
+coconut_vdom__$Html_Text.inst = new coconut_vdom__$Html_Text();
+coconut_vdom__$Renderer_DomBackend.PLACEHOLDER = coconut_diffing_VNodeData.VNative(coconut_vdom__$Html_Text.inst,null,null,"",null);
+coconut_vdom_Renderer.DIFFER = new coconut_diffing_Differ(new coconut_vdom__$Renderer_DomBackend());
 App.main();
 })(typeof window != "undefined" ? window : typeof global != "undefined" ? global : typeof self != "undefined" ? self : this);
