@@ -12,6 +12,10 @@ haxelib git coconut.diffing https://github.com/MVCoconut/coconut.diffing.git
 haxelib git coconut.ui https://github.com/MVCoconut/coconut.ui.git
 ```
 
+## Live demo
+
+You can see it [here](https://t1ml3arn.github.io/coconut.ui-hello-world/bin/)
+
 ## License
 
 GPLv3
